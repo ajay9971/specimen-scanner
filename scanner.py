@@ -82,13 +82,24 @@ def clamav(path):
     return {"available": True, "infected": r.returncode == 1, "signature": sig}
 
 
+BUILTIN = [
+    ("EICAR_Test_File", lambda l: "eicar-standard-antivirus-test-file" in l),
+    ("Suspicious_Downloader_Strings", lambda l: sum(k in l for k in (
+        "urldownloadtofile", "powershell", "-encodedcommand", "downloadstring", "wscript.shell")) >= 2),
+    ("Process_Injection_APIs", lambda l: all(k in l for k in (
+        "virtualallocex", "writeprocessmemory", "createremotethread"))),
+]
+
+
 _rules = None
-def yara_scan(path):
+def yara_scan(path, data=b""):
     global _rules
     try:
         import yara
     except ImportError:
-        return {"available": False, "matches": []}
+        # No yara-python (e.g. on Render): fall back to the same rules written in plain Python
+        low = data[:5_000_000].decode("latin-1").lower()
+        return {"available": True, "builtin": True, "matches": [n for n, t in BUILTIN if t(low)]}
     if _rules is None:
         _rules = yara.compile(filepath=os.path.join(HERE, "rules", "sample.yar"))
     return {"available": True, "matches": [m.rule for m in _rules.match(path)]}
@@ -117,7 +128,7 @@ def score(rep, filename):
     if rep["clamav"].get("infected"):
         s.append((100, f"ClamAV detected {rep['clamav'].get('signature')}"))
     if rep["yara"]["matches"]:
-        s.append((60, "YARA rules matched: " + ", ".join(rep["yara"]["matches"])))
+        s.append((100 if "EICAR_Test_File" in rep["yara"]["matches"] else 60, "YARA rules matched: " + ", ".join(rep["yara"]["matches"])))
     vt = rep["virustotal"]
     if vt.get("found") and vt["malicious"] >= 5:
         s.append((100, f"VirusTotal: {vt['malicious']}/{vt['total']} engines flag this file"))
@@ -149,7 +160,7 @@ def scan_file(path, filename):
         data = f.read()
     rep = {"filename": filename, "size": len(data), "hashes": hashes(data),
            "type": detect_type(data), "entropy": entropy(data), "iocs": extract_iocs(data),
-           "clamav": clamav(path), "yara": yara_scan(path)}
+           "clamav": clamav(path), "yara": yara_scan(path, data)}
     rep["pe"] = analyze_pe(path) if rep["type"] == "exe" else {}
     rep["virustotal"] = virustotal(rep["hashes"]["sha256"])
     rep["score"], rep["verdict"], rep["reasons"] = score(rep, filename)
