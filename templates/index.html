@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Check a file before you open it</h1>
+<p class="lead">Upload a file and get hashes, type, entropy, antivirus and rule matches, and a risk score. The file is deleted right after the scan.</p>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<form class="drop" action="{{ url_for('scan') }}" method="post" enctype="multipart/form-data">
+  <label for="file">File (up to 20 MB)</label>
+  <input id="file" type="file" name="file" required>
+  <button type="submit">Scan file</button>
+</form>
+<form class="inline" action="{{ url_for('lookup') }}" method="get">
+  <label for="q">Look up a past scan by SHA-256</label>
+  <input id="q" name="q" placeholder="paste a SHA-256 hash" pattern="[A-Fa-f0-9]{64}" required>
+  <button type="submit">Look up</button>
+</form>
+<h2>Recent scans</h2>
+{% if recent %}
+<table>
+  <tr><th>File</th><th>Verdict</th><th>Score</th><th>Scanned</th></tr>
+  {% for s in recent %}
+  <tr><td><a href="{{ url_for('report', scan_id=s.id) }}">{{ s.filename }}</a></td>
+      <td><span class="tag {{ s.verdict|lower }}">{{ s.verdict }}</span></td><td>{{ s.score }}</td><td>{{ s.created }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}<p>No scans yet. Try the EICAR test file, a harmless string every antivirus detects on purpose.</p>{% endif %}
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ r.filename }}, {{ r.verdict }}{% endblock %}
+{% block body %}
+<section class="verdict {{ r.verdict|lower }}">
+  <div class="word">{{ r.verdict }}</div>
+  <div>
+    <div class="bar" role="img" aria-label="Risk score {{ r.score }} of 100"><i style="width:{{ r.score }}%"></i></div>
+    <p>Risk score {{ r.score }} of 100 for <b>{{ r.filename }}</b></p>
+  </div>
+</section>
+
+<h2>Why this verdict</h2>
+{% if r.reasons %}<ul>{% for x in r.reasons %}<li>{{ x }}</li>{% endfor %}</ul>
+{% else %}<p>No risk signals found. That is not a guarantee, brand-new malware can look clean.</p>{% endif %}
+
+<h2>File details</h2>
+<dl>
+  <dt>Size</dt><dd>{{ r.size }} bytes</dd>
+  <dt>Detected type</dt><dd>{{ r.type }}</dd>
+  <dt>Entropy</dt><dd>{{ r.entropy }} of 8.0</dd>
+  <dt>MD5</dt><dd class="hash">{{ r.hashes.md5 }}</dd>
+  <dt>SHA-1</dt><dd class="hash">{{ r.hashes.sha1 }}</dd>
+  <dt>SHA-256</dt><dd class="hash">{{ r.hashes.sha256 }}</dd>
+</dl>
+
+<h2>Engines</h2>
+<dl>
+  <dt>ClamAV</dt><dd>{% if not r.clamav.available %}not installed{% elif r.clamav.infected %}{{ r.clamav.signature }}{% else %}no detection{% endif %}</dd>
+  <dt>YARA</dt><dd>{% if not r.yara.available %}not installed{% elif r.yara.matches %}{{ r.yara.matches|join(", ") }}{% else %}no matches{% endif %}</dd>
+  <dt>VirusTotal</dt><dd>{% if not r.virustotal.available %}no API key set{% elif r.virustotal.found %}{{ r.virustotal.malicious }} of {{ r.virustotal.total }} engines flag it{% else %}hash not known{% endif %}</dd>
+</dl>
+
+{% if r.pe and r.pe.valid %}
+<h2>Windows executable</h2>
+<p>{{ r.pe.import_count }} imported functions. Risky imports: {{ r.pe.risky_imports|join(", ") or "none" }}.</p>
+<table><tr><th>Section</th><th>Entropy</th></tr>
+{% for s in r.pe.sections %}<tr><td>{{ s.name }}</td><td>{{ s.entropy }}</td></tr>{% endfor %}</table>
+{% endif %}
+
+<h2>Indicators found inside the file</h2>
+<dl>
+  <dt>URLs</dt><dd class="hash">{{ r.iocs.urls|join("\n") or "none" }}</dd>
+  <dt>IP addresses</dt><dd class="hash">{{ r.iocs.ips|join(", ") or "none" }}</dd>
+  <dt>Keywords</dt><dd>{{ r.iocs.keywords|join(", ") or "none" }}</dd>
+</dl>
+<p><a href="{{ url_for('index') }}">Scan another file</a></p>
+{% endblock %}
